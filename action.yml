@@ -30,11 +30,10 @@ runs:
       id: run-gen
       shell: bash
       run: |
-        cd "${{ github.action_path }}"
-        chmod +x gen_release_notes.sh
-        ./gen_release_notes.sh ${{ inputs.tag_name }} ${{ inputs.config }} > "${{ github.workspace }}/result_changelog.md"
+        chmod +x "${{ github.action_path }}/gen_release_notes.sh"
+        "${{ github.action_path }}/gen_release_notes.sh" ${{ inputs.tag_name }} ${{ inputs.config }} > result_changelog.md
         echo "changelog<<EOF" >> $GITHUB_OUTPUT
-        cat "${{ github.workspace }}/result_changelog.md" >> $GITHUB_OUTPUT
+        cat result_changelog.md >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Create Release
@@ -45,4 +44,4 @@ runs:
       run: |
         gh release create "${{ inputs.tag_name }}" \
           --title "Release ${{ inputs.tag_name }}" \
-          --notes-file "${{ github.workspace }}/result_changelog.md"
+          --notes-file result_changelog.md
