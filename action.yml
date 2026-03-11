@@ -1,61 +1,48 @@
 name: 'Release Notes Generator'
-description: 'Генерирует чейнджлог на основе shell-скрипта и создает релиз'
+description: 'Generates a changelog and creates a GitHub release using gen_release_notes.sh'
 
 inputs:
   tag_name:
-    description: 'Имя тега нового релиза (обязательно)'
+    description: 'The tag name for the new release'
     required: true
   config:
-    description: 'Настройки/аргументы, которые жует тулза'
+    description: 'Additional configuration arguments for the script'
     required: false
     default: ''
   create_release:
-    description: 'Создавать ли GitHub Release автоматически (true/false)'
+    description: 'Automatically create a GitHub Release'
     required: false
     default: 'true'
   github_token:
-    description: 'Токен для создания релиза (по умолчанию используется токен раннера)'
+    description: 'GitHub token for release creation'
     required: false
     default: ${{ github.token }}
 
 outputs:
-  release_notes:
-    description: 'Сгенерированный текст релиза'
-    value: ${{ steps.generate.outputs.changelog }}
+  changelog:
+    description: 'The generated release notes text'
+    value: ${{ steps.run-gen.outputs.changelog }}
 
 runs:
   using: "composite"
   steps:
-    - name: Generate Release Notes
-      id: generate
+    - name: Run Generator
+      id: run-gen
       shell: bash
       run: |
-        echo "Запускаем генератор для тега: ${{ inputs.tag_name }}"
-        
-        # ${{ github.action_path }} указывает на папку, где лежит код этого экшена/тулзы
-        # Замени `main.sh` на реальное имя исполняемого файла тулзы
-        SCRIPT_PATH="${{ github.action_path }}/main.sh" 
-        
-        # На всякий случай даем права на исполнение
-        chmod +x "$SCRIPT_PATH"
-        
-        # Вызываем скрипт, передаем параметры и пишем результат во временный файл
-        # Подправь аргументы так, как их реально принимает скрипт
-        "$SCRIPT_PATH" --tag "${{ inputs.tag_name }}" ${{ inputs.config }} > changelog.md
-        
-        # Выплевываем многострочный результат в output экшена
+        cd "${{ github.action_path }}"
+        chmod +x gen_release_notes.sh
+        ./gen_release_notes.sh ${{ inputs.tag_name }} ${{ inputs.config }} > "${{ github.workspace }}/result_changelog.md"
         echo "changelog<<EOF" >> $GITHUB_OUTPUT
-        cat changelog.md >> $GITHUB_OUTPUT
+        cat "${{ github.workspace }}/result_changelog.md" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
 
-    - name: Create GitHub Release
+    - name: Create Release
       if: ${{ inputs.create_release == 'true' }}
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github_token }}
       run: |
-        echo "Создаем релиз ${{ inputs.tag_name }}..."
         gh release create "${{ inputs.tag_name }}" \
           --title "Release ${{ inputs.tag_name }}" \
-          --notes-file changelog.md
-        echo "Готово! Релиз выкачен."
+          --notes-file "${{ github.workspace }}/result_changelog.md"
