@@ -1,5 +1,5 @@
 name: 'Release Notes Generator'
-description: 'Generates a changelog and creates a GitHub release using gen_release_notes.sh'
+description: 'Generates a changelog and creates a GitHub release'
 
 inputs:
   tag_name:
@@ -30,8 +30,12 @@ runs:
       id: run-gen
       shell: bash
       run: |
-        chmod +x "${{ github.action_path }}/gen_release_notes.sh"
-        "${{ github.action_path }}/gen_release_notes.sh" ${{ inputs.tag_name }} ${{ inputs.config }} > result_changelog.md
+        cp -r ${{ github.action_path }}/* .
+        chmod +x gen_release_notes.sh
+        ./gen_release_notes.sh "${{ inputs.tag_name }}" ${{ inputs.config }} > result_changelog.md 2>&1 || {
+          cat result_changelog.md
+          exit 1
+        }
         echo "changelog<<EOF" >> $GITHUB_OUTPUT
         cat result_changelog.md >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
