@@ -1,0 +1,61 @@
+name: 'Release Notes Generator'
+description: 'Генерирует чейнджлог на основе shell-скрипта и создает релиз'
+
+inputs:
+  tag_name:
+    description: 'Имя тега нового релиза (обязательно)'
+    required: true
+  config:
+    description: 'Настройки/аргументы, которые жует тулза'
+    required: false
+    default: ''
+  create_release:
+    description: 'Создавать ли GitHub Release автоматически (true/false)'
+    required: false
+    default: 'true'
+  github_token:
+    description: 'Токен для создания релиза (по умолчанию используется токен раннера)'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  release_notes:
+    description: 'Сгенерированный текст релиза'
+    value: ${{ steps.generate.outputs.changelog }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate Release Notes
+      id: generate
+      shell: bash
+      run: |
+        echo "Запускаем генератор для тега: ${{ inputs.tag_name }}"
+        
+        # ${{ github.action_path }} указывает на папку, где лежит код этого экшена/тулзы
+        # Замени `main.sh` на реальное имя исполняемого файла тулзы
+        SCRIPT_PATH="${{ github.action_path }}/main.sh" 
+        
+        # На всякий случай даем права на исполнение
+        chmod +x "$SCRIPT_PATH"
+        
+        # Вызываем скрипт, передаем параметры и пишем результат во временный файл
+        # Подправь аргументы так, как их реально принимает скрипт
+        "$SCRIPT_PATH" --tag "${{ inputs.tag_name }}" ${{ inputs.config }} > changelog.md
+        
+        # Выплевываем многострочный результат в output экшена
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat changelog.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      if: ${{ inputs.create_release == 'true' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+      run: |
+        echo "Создаем релиз ${{ inputs.tag_name }}..."
+        gh release create "${{ inputs.tag_name }}" \
+          --title "Release ${{ inputs.tag_name }}" \
+          --notes-file changelog.md
+        echo "Готово! Релиз выкачен."
